@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/deliseev/video-notifier/internal/config"
@@ -13,12 +14,75 @@ import (
 	"github.com/deliseev/video-notifier/internal/infrastructure/notifier"
 	"github.com/deliseev/video-notifier/internal/infrastructure/youtube"
 	"github.com/deliseev/video-notifier/internal/usecase"
+	"github.com/fsnotify/fsnotify"
+)
+
+const interval = 30 * time.Minute
+
+var (
+	// Используем sync для безопасного управления воркерами
+	wg     sync.WaitGroup
+	cancel context.CancelFunc
 )
 
 func main() {
-	// Создаем контекст, который отменяется при сигнале ОС
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop() // Важно: очищаем ресурсы сигнала
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer watcher.Close()
+
+	// 1. Настраиваем канал для сигналов завершения
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt) // Ловим Ctrl+C
+
+	// Начальный запуск
+	reloadWorkers()
+
+	// Следим за файлом
+	err = watcher.Add("config.yaml")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		select {
+		case event, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
+			// В macOS событие Write может срабатывать дважды, это нормально
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				log.Println("Config modified. Reloading...")
+				reloadWorkers()
+			}
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
+			log.Println("error:", err)
+		case <-sigChan: // <--- ОП! Пришел Ctrl+C
+			log.Println("Shutdown signal received...")
+			if cancel != nil {
+				cancel() // Останавливаем воркеры
+			}
+			wg.Wait() // Ждем их завершения
+			log.Println("Graceful shutdown complete.")
+			return // Выходим из программы
+		}
+	}
+}
+
+func reloadWorkers() {
+	// Останавливаем старые воркеры (если были)
+	if cancel != nil {
+		cancel()
+		wg.Wait() // Ждем, пока старые завершатся
+	}
+
+	// Создаем новый контекст для новых воркеров
+	var ctx context.Context
+	ctx, cancel = context.WithCancel(context.Background())
 
 	// Загружаем конфиг
 	f, err := os.Open("config.yaml")
@@ -30,15 +94,9 @@ func main() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	// Инициализируем общие зависимости
-	// repo := sqlite.NewRepository(cfg.DatabasePath)
-	// notifier := telegram.NewNotifier(cfg.TelegramToken)
-
-	// Временно используем заглушку, пока нет БД и Telegram
 	repo := memory.NewInMemoryVideoRepo()
 	notifier := notifier.NewLogNotifier()
 
-	// Запускаем воркеры для каждого плейлиста
 	for _, pl := range cfg.Playlists {
 		fetcher, err := getFetcher(pl.Source)
 		if err != nil {
@@ -48,17 +106,12 @@ func main() {
 
 		checker := usecase.NewVideoChecker(fetcher, repo, notifier)
 
-		// Запускаем каждый воркер в своей горутине
-		go runWorker(ctx, checker, pl.ID, 30*time.Minute)
+		wg.Add(1)
+		go func(p config.PlaylistConfig) {
+			defer wg.Done()
+			runWorker(ctx, checker, p.ID, interval)
+		}(pl)
 	}
-
-	// Блокируемся, пока контекст не будет отменен
-	<-ctx.Done()
-	log.Println("Shutting down gracefully...")
-
-	// Даем время на завершение (опционально)
-	time.Sleep(1 * time.Second)
-	log.Println("Goodbye!")
 }
 
 func runWorker(ctx context.Context, checker *usecase.Checker, playlistID string, interval time.Duration) {

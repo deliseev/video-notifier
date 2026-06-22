@@ -2,3 +2,5 @@ database_path: test.db
 playlists:
 - id: PLwKZ4_gthFJ0uavGK_RQy_l6DiDl_l6jo
   source: youtube
+- id: PL8l6_P-7OGucBR-SMt3GOum1b8IIEXl7V
+  source: youtube
