@@ -44,6 +44,6 @@ go run cmd/notifier/main.go
 - **Adding new platforms**: To add a new source, simply implement the `VideoFetcher` interface in `internal/infrastructure/` and register it in the `getFetcher` factory in `main.go`.
 
 ## Roadmap
+- [x] Integrate `fsnotify` for live config reloading.
 - [x] Implement SQLite persistence for cross-process state.
 - [ ] Add Telegram Bot adapter for notifications.
-- [ ] Integrate `fsnotify` for live config reloading.
