@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/deliseev/video-notifier/internal/config"
-	"github.com/deliseev/video-notifier/internal/infrastructure/memory"
 	"github.com/deliseev/video-notifier/internal/infrastructure/notifier"
+	"github.com/deliseev/video-notifier/internal/infrastructure/sqlite"
 	"github.com/deliseev/video-notifier/internal/infrastructure/youtube"
 	"github.com/deliseev/video-notifier/internal/usecase"
 	"github.com/fsnotify/fsnotify"
@@ -94,7 +94,10 @@ func reloadWorkers() {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
-	repo := memory.NewInMemoryVideoRepo()
+	repo, err := sqlite.NewSqliteRepo(cfg.DatabasePath)
+	if err != nil {
+		log.Fatal(err)
+	}
 	notifier := notifier.NewLogNotifier()
 
 	for _, pl := range cfg.Playlists {

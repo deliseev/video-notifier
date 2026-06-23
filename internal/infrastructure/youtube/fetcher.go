@@ -41,7 +41,15 @@ func (f *YoutubeFetcher) doFetch(ctx context.Context, playlistID string) ([]doma
 	}
 
 	// Тут будет магия XML парсинга
-	return f.parseRSS(resp.Body)
+	videos, err := f.parseRSS(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	// Добавить PlaylistID
+	for i := range videos {
+		videos[i].PlaylistID = playlistID
+	}
+	return videos, nil
 }
 
 func (f *YoutubeFetcher) FetchLatestVideos(ctx context.Context, playlistID string) ([]domain.Video, error) {
