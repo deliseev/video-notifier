@@ -10,6 +10,7 @@ type Config struct {
 	DatabasePath  string           `yaml:"database_path"`
 	TelegramToken string           `yaml:"telegram_token"`
 	Playlists     []PlaylistConfig `yaml:"playlists"`
+	ChatID        int64            `yaml:"chat_id"`
 }
 
 type PlaylistConfig struct {

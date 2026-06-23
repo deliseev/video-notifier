@@ -10,6 +10,8 @@ import (
 func TestLoadConfig(t *testing.T) {
 	yamlData := `
 database_path: test.db
+telegram_token: xxx
+chat_id: 123
 playlists:
 - id: test-id
   source: youtube
@@ -28,5 +30,8 @@ playlists:
 	}
 	if len(cfg.Playlists) != 1 || cfg.Playlists[0].ID != "test-id" {
 		t.Error("config playlists not parsed correctly")
+	}
+	if cfg.ChatID != 123 {
+		t.Errorf("got %v want 123", cfg.ChatID)
 	}
 }

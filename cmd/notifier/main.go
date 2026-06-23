@@ -98,7 +98,10 @@ func reloadWorkers() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	notifier := notifier.NewLogNotifier()
+	notifier, err := notifier.NewTelegramNotifier(cfg.TelegramToken, cfg.ChatID)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	for _, pl := range cfg.Playlists {
 		fetcher, err := getFetcher(pl.Source)

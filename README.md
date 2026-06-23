@@ -46,4 +46,4 @@ go run cmd/notifier/main.go
 ## Roadmap
 - [x] Integrate `fsnotify` for live config reloading.
 - [x] Implement SQLite persistence for cross-process state.
-- [ ] Add Telegram Bot adapter for notifications.
+- [x] Add Telegram Bot adapter for notifications.
